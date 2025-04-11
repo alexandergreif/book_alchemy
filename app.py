@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from data_models import db, Author, Book
 from datetime import datetime
@@ -70,7 +70,11 @@ def add_book():
         author_id = request.form.get('author_id')
 
         # Convert publication_year if provided.
-        publication_year = int(publication_year_str) if publication_year_str and publication_year_str.isdigit() else None
+        publication_year = int(publication_year_str) \
+            if (publication_year_str and publication_year_str.isdigit()) \
+            else None
+
+
 
         # Create the new Book instance. Notice that author_id is received as string, but that's acceptable
         # as long as your database column is an integer and SQLAlchemy can convert it.
@@ -86,20 +90,59 @@ def add_book():
     # Render the add_book.html template while passing the list of authors and any success message.
     return render_template("add_book.html", authors=authors, success_message=success_message)
 
-@app.route("/", methods=['GET'])
-def home():
-    sort_by = request.args.get("sort_by", "title")  # default sort by title
 
+@app.route("/", methods=["GET"])
+def home():
+    sort_by = request.args.get("sort_by", "title")  # Default to sorting by title.
+    keyword = request.args.get("q")
+    success_message = request.args.get("success_message")  # Retrieve the message if present.
+
+    # Start building the query.
+    query = Book.query
+
+    # If a keyword search is provided, filter using ilike (case-insensitive).
+    if keyword:
+        query = query.filter(Book.title.ilike(f"%{keyword}%"))
+
+    # Apply sorting.
     if sort_by == "title":
-        books = Book.query.order_by(Book.title).all()
+        query = query.order_by(Book.title)
     elif sort_by == "publication_year":
-        books = Book.query.order_by(Book.publication_year).all()
+        query = query.order_by(Book.publication_year)
     elif sort_by == "author":
-        # When sorting by author, perform a join with the Author model
-        books = db.session.query(Book).join(Author).order_by(Author.name).all()
+        query = query.join(Author).order_by(Author.name)
     else:
-        books = Book.query.order_by(Book.title).all()
-    return render_template("home.html", books=books, current_sort=sort_by)
+        query = query.order_by(Book.title)
+
+    books = query.all()
+
+    return render_template(
+        "home.html",
+        books=books,
+        current_sort=sort_by,
+        success_message=success_message
+    )
+
+
+@app.route("/book/<int:book_id>/delete", methods=["POST"])
+def delete_book(book_id):
+    # Retrieve the book, or return a 404 if not found.
+    book = Book.query.get_or_404(book_id)
+    title = book.title  # Save title for message display.
+    author = book.author
+
+    # Delete the book.
+    db.session.delete(book)
+    db.session.commit()
+
+    # Check if the author has any books remaining.
+    if not author.books:
+        db.session.delete(author)
+        db.session.commit()
+
+    # Redirect to the home page, passing the success message as a query parameter.
+    success_message = f"Book '{title}' deleted successfully!"
+    return redirect(url_for("home", success_message=success_message))
 
 if __name__ == "__main__":
     app.run(debug=True)
