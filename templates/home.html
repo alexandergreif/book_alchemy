@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  </head>
+  <body>
+      <div>
+        <label for="sort">Sort by:</label>
+        <select id="sort" onchange="window.location.href='/?sort_by=' + this.value">
+          <option value="title"
+            {% if current_sort == 'title' %} selected {% endif %}>Title</option>
+
+          <option value="author"
+            {% if current_sort == 'author' %} selected {% endif %}>Author</option>
+
+          <option value="publication_year"
+            {% if current_sort == 'publication_year' %} selected {% endif %}>
+            Publication Year
+          </option>
+        </select>
+      </div>
+    {% for book in books %}
+      <div>
+        <h3>{{ book.title }}</h3>
+        <p>Publication Year: {{ book.publication_year }}</p>
+        <p>Author: {{ book.author.name }}</p>
+      </div>
+    {% endfor %}
+
+  </body>
+</html>
